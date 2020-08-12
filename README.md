@@ -108,8 +108,8 @@ disable). by default sensor is enabled (`size_bucket_list=None`), because depend
 `size_bucket_list` value should change, I recommend you test the best performance for your computer modifying 
 `size_bucket_list` (with `None` and with number value).
 
-You can delimite sensor scope whit `min_size_bucket_list` and `max_size_bucket_list` (if `max_size_bucket_list` 
-is None then is infinte):
+You can delimite sensor scope with `min_size_bucket_list` and `max_size_bucket_list` (if `max_size_bucket_list` 
+is None then is infinite):
 ```python
 qq = QQueue(min_size_bucket_list=10, max_size_bucket_list=1000)
 ```
