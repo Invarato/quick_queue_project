@@ -108,10 +108,21 @@ disable). by default sensor is enabled (`size_bucket_list=None`), because depend
 `size_bucket_list` value should change, I recommend you test the best performance for your computer modifying 
 `size_bucket_list` (with `None` and with number value).
 
+You can delimite sensor scope whit `min_size_bucket_list` and `max_size_bucket_list` (if `max_size_bucket_list` 
+is None then is infinte):
+```python
+qq = QQueue(min_size_bucket_list=10, max_size_bucket_list=1000)
+```
+
+To disable the sensor define a size in `size_bucket_list`:
+```python
+qq = QQueue(size_bucket_list=120)
+```
+
 
 ## Performance test
 Hardware where the tests have been done:
- * Processor: Intel i5 3 Generation 3.2GHz
+ * Processor: Intel i5 3.2GHz
  * Operating System: Windows 10 x64
  
 Use `python3 tests\performance_qqueue_vs_queue.py`
