@@ -9,7 +9,7 @@ https://docs.python.org/3/library/multiprocessing.html?highlight=process#pipes-a
 Last release version of the project to install in: https://pypi.org/project/quick_queue_project/
 
 ```
-pip install quick_queue_project
+pip install quick-queue
 ```
 
 ## Introduction
