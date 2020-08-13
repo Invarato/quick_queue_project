@@ -5,7 +5,14 @@
 import logging
 import multiprocessing.context
 import multiprocessing.queues
+import multiprocessing.managers
 import sys
+
+try:
+    import queue
+except ImportError:
+    # python 3.x
+    import Queue as queue
 
 
 __test__ = {'import_test': """
@@ -95,11 +102,13 @@ class QuickQueue(multiprocessing.queues.Queue):
                                  and size_bucket_list==None then size_bucket_list is default to 1000; other wise,
                                  if maxsize<=0 and size_bucket_list is defined, then use this number. By default: None
         :param min_size_bucket_list: (only if sensor is enabled) min size bucket list.
-                                     Min == 1 and max == max_size_bucket_list - 1. By default: 10
+                                     Min == 1 and max == max_size_bucket_list - 1 (other wise, this raise a ValueError).
+                                     By default: 10
         :param max_size_bucket_list: (only if sensor is enabled) max size bucket list. If None is infinite.
                                      By defatult: None
+        :raise ValueError: if min_size_bucket_list is not: 1 < min_size_bucket_list <= max_size_bucket_list - 1
         """
-        super(QuickQueue, self).__init__(maxsize, ctx=multiprocessing.get_context())
+        multiprocessing.queues.Queue.__init__(self, maxsize, ctx=multiprocessing.get_context())
         logging.basicConfig(stream=sys.stderr, level=logging_level)
 
         if maxsize and maxsize > 0:
@@ -118,10 +127,15 @@ class QuickQueue(multiprocessing.queues.Queue):
         self.def_max_size_bucket_list = max_size_bucket_list
         if max_size_bucket_list:
             self.max_size_bucket_list = self.def_max_size_bucket_list
-            self.half_max_size_bucket_list = self.max_size_bucket_list // 2
+            self.half_max_size_bucket_list = self.max_size_bucket_list / 2
         else:
             self.max_size_bucket_list = 10000
-            self.half_max_size_bucket_list = self.max_size_bucket_list // 2
+            self.half_max_size_bucket_list = self.max_size_bucket_list / 2
+
+        if min_size_bucket_list < 1 or min_size_bucket_list > self.max_size_bucket_list - 1:
+            raise ValueError("min_size_bucket_list={} but range permitted: "
+                             "1 < min_size_bucket_list <= max_size_bucket_list - 1".format(min_size_bucket_list))
+
         self.min_size_bucket_list = min_size_bucket_list
         self.min_size_bucket_list_plusone = min_size_bucket_list + 1
 
@@ -153,7 +167,7 @@ class QuickQueue(multiprocessing.queues.Queue):
                 mult = (qsize-self.half_max_size) / self.half_max_size
 
             new_size_bucket_list = int(self.half_max_size_bucket_list + (self.half_max_size_bucket_list * mult))
-            if new_size_bucket_list < self.min_size_bucket_list_plusone:
+            if new_size_bucket_list < self.min_size_bucket_list:
                 new_size_bucket_list = self.min_size_bucket_list
 
             self.cache_size_bucket_list[qsize] = new_size_bucket_list
@@ -171,15 +185,19 @@ class QuickQueue(multiprocessing.queues.Queue):
             qsize = self.qsize()
             if self.determinate_max:
                 self.size_bucket_list += 100
-                if qsize < self.max_qsize_determinate_max:
+                if qsize < self.max_qsize_determinate_max or \
+                        (self.def_max_size_bucket_list and self.size_bucket_list > self.def_max_size_bucket_list):
                     self.determinate_max = False
                     if self.def_max_size_bucket_list:
                         self.max_size_bucket_list = min(self.def_max_size_bucket_list, self.def_max_size_bucket_list)
                     else:
                         self.max_size_bucket_list = self.size_bucket_list
 
-                    self.half_max_size_bucket_list = self.max_size_bucket_list // 2
+                    self.half_max_size_bucket_list = self.max_size_bucket_list / 2
                     self.max_qsize_determinate_max = 0
+
+                    if self.size_bucket_list > self.max_size_bucket_list:
+                        self.size_bucket_list = self.max_size_bucket_list
 
                     logging.debug("[QQUEUE - MAX DETERMINATE]: "
                                   "max_size_bucket_list={}".format(self.max_size_bucket_list))
@@ -198,7 +216,7 @@ class QuickQueue(multiprocessing.queues.Queue):
                             self.max_size_bucket_list = (max(self.set_values) + self.max_size_bucket_list) // 2
                             self.set_values = set()
                             self.touch_min_size_bucket_list = 0
-                            self.half_max_size_bucket_list = self.max_size_bucket_list // 2
+                            self.half_max_size_bucket_list = self.max_size_bucket_list / 2
                             self.cache_size_bucket_list = {}
                             logging.debug("[QQUEUE - OVERFLOW BELOW]: "
                                           "max_size_bucket_list={}".format(self.max_size_bucket_list))

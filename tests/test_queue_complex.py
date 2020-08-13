@@ -42,7 +42,7 @@ def _is_parent_process_killed():
     return os.getppid() == 1
 
 
-def _mprocess(proxy_queue,
+def _mprocess(qq,
               proxy_start_event,
               proxy_end_event,
               logging_level):
@@ -56,13 +56,13 @@ def _mprocess(proxy_queue,
     loop_enable = True
     while loop_enable:
         try:
-            _ = proxy_queue.get(timeout=0.1)
-            # print("VALUE IN PROCESS: {}".format(value))
+            _ = qq.get(timeout=0.1)
+            # TODO print("VALUE IN PROCESS: {}".format(value))
 
             times_waiting = 0
 
         except queue.Empty:
-            loop_enable = not (proxy_end_event.is_set() and proxy_queue.empty())
+            loop_enable = not (proxy_end_event.is_set() and qq.empty())
             if loop_enable:
                 times_waiting += 1
                 if proxy_start_event.is_set():
@@ -101,9 +101,10 @@ if __name__ == "__main__":
     logging.basicConfig(stream=sys.stderr, level=logging_level)
 
     queue_max_size = 1000
-    proxy_queue = QQueue(queue_max_size,
-                         max_size_bucket_list=923,
-                         logging_level=logging.DEBUG)
+    qq = QQueue(queue_max_size,
+                max_size_bucket_list=None,
+                min_size_bucket_list=10,
+                logging_level=logging.DEBUG)
 
     proxy_end_event = multiprocessing.Event()
     proxy_end_event.clear()
@@ -111,7 +112,7 @@ if __name__ == "__main__":
     proxy_start_event = multiprocessing.Event()
     proxy_start_event.clear()
     print("ROOT start =================================")
-    process = multiprocessing.Process(target=_mprocess, args=(proxy_queue,
+    process = multiprocessing.Process(target=_mprocess, args=(qq,
                                                               proxy_start_event,
                                                               proxy_end_event,
                                                               logging_level))
@@ -123,8 +124,8 @@ if __name__ == "__main__":
     proxy_start_event.set()
     n = 0
     for n, value in enumerate(itertools.chain(*itertools.repeat(iterable_with_data, times=times_repeat)), 1):
-        proxy_queue.put("[{}]: {}".format(n, value))
-    proxy_queue.end()
+        qq.put("[{}]: {}".format(n, value))
+    qq.end()
 
     finish = datetime.now()
     print("[ROOT ending] finish: {} | diff finish-start: {}".format(finish, finish-start))
@@ -132,5 +133,5 @@ if __name__ == "__main__":
     print("ROOT join ================================= n: {}".format(n))
     proxy_end_event.set()
     process.join()
-    proxy_queue.close()
+    qq.close()
     print("ROOT end =================================")
