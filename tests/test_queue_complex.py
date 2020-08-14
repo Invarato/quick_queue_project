@@ -56,7 +56,7 @@ def _mprocess(qq,
     loop_enable = True
     while loop_enable:
         try:
-            _ = qq.get(timeout=0.1)
+            value = qq.get(timeout=0.1)
             # TODO print("VALUE IN PROCESS: {}".format(value))
 
             times_waiting = 0

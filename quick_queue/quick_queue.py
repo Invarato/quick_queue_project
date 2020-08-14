@@ -5,7 +5,6 @@
 import logging
 import multiprocessing.context
 import multiprocessing.queues
-import multiprocessing.managers
 import sys
 
 try:
@@ -109,14 +108,85 @@ class QuickQueue(multiprocessing.queues.Queue):
         :raise ValueError: if min_size_bucket_list is not: 1 < min_size_bucket_list <= max_size_bucket_list - 1
         """
         multiprocessing.queues.Queue.__init__(self, maxsize, ctx=multiprocessing.get_context())
-        logging.basicConfig(stream=sys.stderr, level=logging_level)
 
+        self.enable_sensor = None
+        self.size_bucket_list = None
+        self.bucket_getting = None
+        self.bucket_list = None
+
+        self.c_max_size = None
+        self.half_max_size = None
+
+        self.def_max_size_bucket_list = None
+        self.max_size_bucket_list = None
+        self.half_max_size_bucket_list = None
+
+        self.min_size_bucket_list = None
+        self.min_size_bucket_list_plusone = None
+
+        self.wait_check = None
+
+        self.change_quick = None
+        self.prev_stable = None
+
+        self.determinate_max = None
+        self.max_qsize_determinate_max = None
+        self.cache_size_bucket_list = None
+        self.set_values = None
+        self.touch_min_size_bucket_list = None
+        self.touch_max_size_bucket_list = None
+
+        self.init_args = {'maxsize': maxsize,
+                          'size_bucket_list': size_bucket_list,
+                          'min_size_bucket_list': min_size_bucket_list,
+                          'max_size_bucket_list': max_size_bucket_list,
+                          'logging_level': logging_level}
+
+        self.init(**self.init_args)
+
+    def get_init_args(self):
+        """
+        This return initial args.
+
+        :return: return a dict with your args
+        """
+        return self.init_args
+
+    def init(self,
+             maxsize=1000,
+             size_bucket_list=None,
+             min_size_bucket_list=10,
+             max_size_bucket_list=None,
+             logging_level=logging.WARNING):
+        """
+        Initialization in each process.
+
+        :param maxsize: maxsize of buckets in queue. If maxsize<=0 then queue is infinite (and sensor is disabled).
+                        By default: 1000
+        :param size_bucket_list: None to enable sensor size bucket list (require maxsize>0). If a number is defined
+                                 here then use this number to size_bucket_list and disable sensor. If maxsize<=0
+                                 and size_bucket_list==None then size_bucket_list is default to 1000; other wise,
+                                 if maxsize<=0 and size_bucket_list is defined, then use this number. By default: None
+        :param min_size_bucket_list: (only if sensor is enabled) min size bucket list.
+                                     Min == 1 and max == max_size_bucket_list - 1 (other wise, this raise a ValueError).
+                                     By default: 10
+        :param max_size_bucket_list: (only if sensor is enabled) max size bucket list. If None is infinite.
+                                     By defatult: None
+        :raise ValueError: if min_size_bucket_list is not: 1 < min_size_bucket_list <= max_size_bucket_list - 1
+        :return:
+        """
+
+        logging.basicConfig(stream=sys.stderr, level=logging_level)
         if maxsize and maxsize > 0:
             self.enable_sensor = not bool(size_bucket_list)
             self.size_bucket_list = size_bucket_list if size_bucket_list else 10
         else:
             self.enable_sensor = False
             self.size_bucket_list = size_bucket_list if size_bucket_list else 1000
+
+        logging.debug("[QQUEUE - SENSOR INIT]: enable_sensor={} | "
+                      "size_bucket_list={}".format(self.enable_sensor,
+                                                   self.size_bucket_list))
 
         self.bucket_getting = list()
         self.bucket_list = list()
@@ -238,7 +308,7 @@ class QuickQueue(multiprocessing.queues.Queue):
                           "size_bucket_list={}".format(qsize,
                                                        self.size_bucket_list))
 
-    def put_bucket(self, bucket, *args):
+    def put_bucket(self, bucket, *args, **kwargs):
         """
         This put in queue a list of data
 
@@ -246,13 +316,16 @@ class QuickQueue(multiprocessing.queues.Queue):
         :param args: args to put queue method
         :return:
         """
-        super().put(bucket, *args)
+        super().put(bucket, *args, **kwargs)
 
-    def put(self, value, *args):
+    def put(self, value, *args, **kwargs):
         """
         This put in queue a data wrapped in a list. Accumulate data until size_bucket_list, then put in queue.
 
-        In the end all put all, call to put_remain() to ensure enqueue all buckets
+        In the end all put all, call to put_remain() to ensure enqueue all buckets.
+
+        Note: If you put in other process different where QQueue was instanced, then you should be call to init()
+        method prior to put. In other case, default values will load in other process instance by default.
 
         :param value: individual value to enqueue
         :param args: args to put queue method
@@ -262,15 +335,20 @@ class QuickQueue(multiprocessing.queues.Queue):
             self.bucket_list.append(value)
 
             if len(self.bucket_list) > self.size_bucket_list:
-                self.put_bucket(self.bucket_list, *args)
+                self.put_bucket(self.bucket_list, *args, **kwargs)
                 self.bucket_list = list()
 
                 if self.enable_sensor:
                     self._sensor_size_list()
         except AttributeError:
-            self.put_bucket([value], *args)
+            self.init(maxsize=1000,
+                      size_bucket_list=None,
+                      min_size_bucket_list=10,
+                      max_size_bucket_list=None,
+                      logging_level=logging.WARNING)
+            self.bucket_list = [value]
 
-    def put_remain(self, *args):
+    def put_remain(self, *args, **kwargs):
         """
         Call to enqueue rest values that remains
 
@@ -278,10 +356,10 @@ class QuickQueue(multiprocessing.queues.Queue):
         :return:
         """
         if self.bucket_list:
-            self.put_bucket(self.bucket_list, *args)
-            del self.bucket_list
+            self.put_bucket(self.bucket_list, *args, **kwargs)
+            self.bucket_list = list()
 
-    def put_iterable(self, iterable, *args):
+    def put_iterable(self, iterable, *args, **kwargs):
         """
         This put in this QQueue all data from an iterable.
 
@@ -294,7 +372,7 @@ class QuickQueue(multiprocessing.queues.Queue):
         :return:
         """
         for v in iterable:
-            self.put(v, *args)
+            self.put(v, *args, **kwargs)
 
         self.put_remain()
 

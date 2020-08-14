@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="quick-queue",
-    version="1.0.3",
+    version="1.0.4",
     author="Ramon Invarato Menendez",
     author_email="r.invarato@gmail.com",
     description="Quick Multiprocessing Queue for Python (Wrap of multiprocessing.queue to increase data transfer "

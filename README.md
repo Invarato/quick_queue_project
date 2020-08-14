@@ -94,6 +94,63 @@ if __name__ == "__main__":
     p.join()
 ```
 
+If you need to use `put` in other process, then you need to initialize values in QQueue with `init`. Due to 
+Python message pass between process it is not possible share values in the same shared Queue object (at least I have 
+not found the way) and, by other side, maybe you want to define a different initial values per "put process" to
+sensor work calculation.
+```python
+def _process(qq):
+    # Define initial args to this process, if you do not call to init method, then it use default values
+    qq.init("""<Defined args>""")
+
+    qq.put("A")
+    qq.put("B")
+    qq.put("C")
+
+    qq.end()
+
+if __name__ == "__main__":
+
+    qq = QQueue()
+
+    p = multiprocessing.Process(target=_process, args=(qq,))
+    p.start()
+
+    print(qq.get())
+    print(qq.get())
+    print(qq.get())
+
+    p.join()
+```
+
+You can use defined args in the main constructor if you pass values. You can get initial args 
+with `get_init_args` (return a dict with your args) in process where you instanced QQueue, 
+then in second process you can expand those args in `init` method with `**`.
+
+```python
+def _process(qq, init_args):
+    qq.init(**init_args)
+
+    qq.put("A")
+    qq.put("B")
+    qq.put("C")
+
+    qq.end()
+
+if __name__ == "__main__":
+
+    qq = QQueue("""<Defined args>""")
+
+    p = multiprocessing.Process(target=_process, args=(qq, qq.get_init_args()))
+    p.start()
+
+    print(qq.get())
+    print(qq.get())
+    print(qq.get())
+
+    p.join()
+```
+
 
 ## About performance
 An important fact is the size of list (named here "bucket list") in relation productor and consumers process to have 

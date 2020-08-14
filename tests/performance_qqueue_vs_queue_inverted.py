@@ -32,9 +32,21 @@ count_elements = 1000000
 
 def _process(q_qq):
     start = datetime.now()
+
+    try:
+        q_qq.initialice_in_process(1000)
+    except AttributeError:
+        pass
+
     print("[PROCESS START]: {}".format(start))
-    for _ in range(1, count_elements):
-        __ = q_qq.get()
+    for num in range(1, count_elements):
+        q_qq.put(num)
+
+    try:
+        q_qq.end()
+    except AttributeError:
+        pass
+
     finish = datetime.now()
     print("[PROCESS END] finish: {} | diff finish-start: {}".format(finish, finish-start))
 
@@ -49,9 +61,9 @@ if __name__ == "__main__":
 
     p = multiprocessing.Process(target=_process, args=(qq,))
     p.start()
-    for num in range(1, count_elements):
-        qq.put(num)
-    qq.end()
+
+    for _ in range(1, count_elements):
+        __ = qq.get()
 
     p.join()
 
@@ -68,8 +80,8 @@ if __name__ == "__main__":
     p = multiprocessing.Process(target=_process, args=(q,))
     p.start()
 
-    for num in range(1, count_elements):
-        q.put(num)
+    for _ in range(1, count_elements):
+        __ = q.get()
 
     q.close()
 
