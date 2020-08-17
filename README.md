@@ -68,10 +68,10 @@ if __name__ == "__main__":
     p.join()
 ```
 Note: you need to call `end` method to perform remain operation and close queue. If you only want put remain data in
-queue, you can call `put_remain`, then you need to call manually to `close` (or `end`, this performs `close` operation 
+queue, you can call `put_remain`, then you need to call manually to `close` (or `end`, this performs `close` operation
 too).
 
-You can put al values in one iterable or several iterables whit `put_iterable` method (`put_iterable` perform remain 
+You can put al values in one iterable or several iterables with `put_iterable` method (`put_iterable` perform remain
 operation when iterable is consumed; but this not close queue, you need call to `close()` or to `end()` in this case):
 ```python
 def _process(qq):
@@ -88,14 +88,14 @@ if __name__ == "__main__":
 
     qq.put_iterable(["A", "B", "C"])
     qq.put_iterable(["D", "E", "F"])
-    
+
     qq.end()
 
     p.join()
 ```
 
-If you need to use `put` in other process, then you need to initialize values in QQueue with `init`. Due to 
-Python message pass between process it is not possible share values in the same shared Queue object (at least I have 
+If you need to use `put` in other process, then you need to initialize values in QQueue with `init`. Due to
+Python message pass between process it is not possible share values in the same shared Queue object (at least I have
 not found the way) and, by other side, maybe you want to define a different initial values per "put process" to
 sensor work calculation.
 ```python
@@ -123,8 +123,8 @@ if __name__ == "__main__":
     p.join()
 ```
 
-You can use defined args in the main constructor if you pass values. You can get initial args 
-with `get_init_args` (return a dict with your args) in process where you instanced QQueue, 
+You can use defined args in the main constructor if you pass values. You can get initial args
+with `get_init_args` (return a dict with your args) in process where you instanced QQueue,
 then in second process you can expand those args in `init` method with `**`.
 
 ```python
@@ -153,19 +153,19 @@ if __name__ == "__main__":
 
 
 ## About performance
-An important fact is the size of list (named here "bucket list") in relation productor and consumers process to have 
+An important fact is the size of list (named here "bucket list") in relation productor and consumers process to have
 the best performance:
  * If queue is full, mean consumers are slower than productor.
- * If queue is empty, mean productor is slower than consumers. 
- 
-Then, best size of bucket list (`size_bucket_list`) is where queue is not full and not empty; for this, I implemented 
-one sensor to determinate in realtime the `size_bucket_list`, you can enable this sensor if `size_bucket_list` is `None` 
-(if you define a number in `size_bucket_list`, then you want a constant value to `size_bucket_list` and sensor 
-disable). by default sensor is enabled (`size_bucket_list=None`), because depend on Hardware in your computer this 
-`size_bucket_list` value should change, I recommend you test the best performance for your computer modifying 
+ * If queue is empty, mean productor is slower than consumers.
+
+Then, best size of bucket list (`size_bucket_list`) is where queue is not full and not empty; for this, I implemented
+one sensor to determinate in realtime the `size_bucket_list`, you can enable this sensor if `size_bucket_list` is `None`
+(if you define a number in `size_bucket_list`, then you want a constant value to `size_bucket_list` and sensor
+disable). by default sensor is enabled (`size_bucket_list=None`), because depend on Hardware in your computer this
+`size_bucket_list` value should change, I recommend you test the best performance for your computer modifying
 `size_bucket_list` (with `None` and with number value).
 
-You can delimite sensor scope with `min_size_bucket_list` and `max_size_bucket_list` (if `max_size_bucket_list` 
+You can delimite sensor scope with `min_size_bucket_list` and `max_size_bucket_list` (if `max_size_bucket_list`
 is None then is infinite):
 ```python
 qq = QQueue(min_size_bucket_list=10, max_size_bucket_list=1000)
@@ -181,22 +181,22 @@ qq = QQueue(size_bucket_list=120)
 Hardware where the tests have been done:
  * Processor: Intel i5 3.2GHz
  * Operating System: Windows 10 x64
- 
+
 Use `python3 tests\performance_qqueue_vs_queue.py`
 
 Put in a producer process and get in a consumer process N elements with `QuickQueue` and `multiprocessing.queue`:
 
-10,000,000 elements (time: Queue = QuickQueue x 13.28 faster): 
+10,000,000 elements (time: Queue = QuickQueue x 13.28 faster):
 ```
 QuickQueue: 0:00:24.436001 | Queue: 0:05:24.488149
 ```
 
-1,000,000 elements (time: Queue = QuickQueue x 17.55 faster): 
+1,000,000 elements (time: Queue = QuickQueue x 17.55 faster):
 ```
 QuickQueue: 0:00:01.877998 | Queue: 0:00:32.951001
 ```
 
-100,000 elements (ftime: Queue = QuickQueue x 6.32 faster): 
+100,000 elements (time: Queue = QuickQueue x 6.32 faster):
 ```
 QuickQueue: 0:00:00.591002 | Queue: 0:00:03.736011
 ```
@@ -205,7 +205,7 @@ QuickQueue: 0:00:00.591002 | Queue: 0:00:03.736011
 
 ### Functions:
  * `QQueue`: Main method to create a `QuickQueue` object configured. Args:
-     * `maxsize`: maxsize of bucket lists in queue. If `maxsize<=0` then queue is infinite (and sensor is disabled, I 
+     * `maxsize`: maxsize of bucket lists in queue. If `maxsize<=0` then queue is infinite (and sensor is disabled, I
      recommend always define one positive number to save RAM memory). By default: `1000`
      * `size_bucket_list`: `None` to enable sensor size bucket list (require `maxsize>0`). If a number is defined
                                  here then use this number to size_bucket_list and disable sensor. If `maxsize<=0`
@@ -214,15 +214,22 @@ QuickQueue: 0:00:00.591002 | Queue: 0:00:03.736011
      * `min_size_bucket_list`: (only if sensor is enabled) min size bucket list.
                                      `Min == 1` and `max == max_size_bucket_list - 1`. By default: `10`
      * `max_size_bucket_list`: (only if sensor is enabled) max size bucket list. If `None` is infinite.
-                                     By defatult: `None`
+                                     By default: `None`
 
 ### Class:
-This is a class whit heritage `multiprocessing.queues.Queue`. Methods overwritten:
- * `put_bucket`: This put in queue a list of data.
- * `put`: This put in queue a data wrapped in a list. Accumulate data until size_bucket_list, then put in queue.
+This is a class with heritage `multiprocessing.queues.Queue`. Methods overwritten:
+ * `put_bucket`: This put in the queue a list of data.
+ * `put`: This put in the queue a data wrapped in a list. Accumulate data until size_bucket_list, then put in queue.
  * `put_remain`: Call to enqueue rest values that remains.
  * `put_iterable`: This put in this QQueue all data from an iterable.
  * `end`: Helper to call to put_remain and close queue in one method.
  * `get_bucket`: This get from queue a list of data.
  * `get`: This get from queue a data unwrapped from the list.
  * `qsize`: This return the number of bucket lists (not the number of elements)
+
+
+## Is useful for you?
+Maybe you would be so kind to consider the amount of hours puts in, the great effort and the resources expended in 
+doing this project. Thank you.
+
+[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=PWRRXZ2HETVG8&source=url)
