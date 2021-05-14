@@ -69,7 +69,7 @@ if __name__ == "__main__":
     p.start()
 
     for _ in range(1, count_elements):
-        __ = qjq.get()
+        __ = jq.get()
         jq.task_done()
 
     p.join()
