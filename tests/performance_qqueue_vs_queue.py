@@ -2,20 +2,8 @@
 #
 # @autor: Ramón Invarato Menéndez
 # @version 1.0
-import gc
-import itertools
-import logging
 import multiprocessing
-import os
-import sys
-import time
 from datetime import datetime
-
-try:
-    import queue
-except ImportError:
-    # python 3.x
-    import Queue as queue
 
 from quick_queue.quick_queue import QQueue
 from multiprocessing import Queue
@@ -78,5 +66,5 @@ if __name__ == "__main__":
     finish = datetime.now()
     diff2 = finish-start
     print("[ROOT END] finish: {} | diff finish-start: {}".format(finish, diff2))
-
+    print("")
     print("[ROOT COMPARE] diff QuickQueue: {} | diff Queue: {}".format(diff1, diff2))

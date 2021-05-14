@@ -4,12 +4,6 @@
 # @version 1.0
 import multiprocessing
 
-try:
-    import queue
-except ImportError:
-    # python 3.x
-    import Queue as queue
-
 from quick_queue.quick_queue import QQueue
 
 """

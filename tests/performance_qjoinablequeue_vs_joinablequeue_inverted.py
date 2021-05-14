@@ -5,35 +5,32 @@
 import multiprocessing
 from datetime import datetime
 
-from quick_queue.quick_queue import QQueue
-from multiprocessing import Queue
+from quick_queue.quick_queue import QJoinableQueue
+from multiprocessing import JoinableQueue
 
 """
 Execute this script to see result in console
 
-Compare in your system the performance of QuickQueue vs Multiprocessing.Queue
+Compare in your system the performance of QuickJoinableQueue vs Multiprocessing.JoinableQueue
 
 :param count_elements: generate more elements to test in a range method
 """
 count_elements = 1000000
 
 
-def _process(q_qq):
+def _process(jq_qjq):
     start = datetime.now()
 
     try:
-        q_qq.initialice_in_process(1000)
+        jq_qjq.initialice_in_process(1000)
     except AttributeError:
         pass
 
     print("[PROCESS START]: {}".format(start))
     for num in range(1, count_elements):
-        q_qq.put(num)
+        jq_qjq.put(num)
 
-    try:
-        q_qq.end()
-    except AttributeError:
-        pass
+    jq_qjq.join()
 
     finish = datetime.now()
     print("[PROCESS END] finish: {} | diff finish-start: {}".format(finish, finish-start))
@@ -41,42 +38,46 @@ def _process(q_qq):
 
 if __name__ == "__main__":
 
-    print("========================= VELOCITY TEST IN QUICK QUEUE =========================")
+    print("========================= VELOCITY TEST IN QUICK JOINABLE QUEUE =========================")
 
     start = datetime.now()
     print("[ROOT START]: {}".format(start))
-    qq = QQueue(1000)
+    qjq = QJoinableQueue(1000)
 
-    p = multiprocessing.Process(target=_process, args=(qq,))
+    p = multiprocessing.Process(target=_process, args=(qjq,))
     p.start()
 
     for _ in range(1, count_elements):
-        __ = qq.get()
+        __ = qjq.get()
+        qjq.task_done()
 
     p.join()
+
+    qjq.close()
 
     finish = datetime.now()
     diff1 = finish-start
     print("[ROOT END] finish: {} | diff finish-start: {}".format(finish, diff1))
 
-    print("========================= VELOCITY TEST IN NORMAL QUEUE =========================")
+    print("========================= VELOCITY TEST IN NORMAL JOINABLE QUEUE =========================")
 
     start = datetime.now()
     print("[ROOT START]: {}".format(start))
-    q = Queue()
+    jq = JoinableQueue()
 
-    p = multiprocessing.Process(target=_process, args=(q,))
+    p = multiprocessing.Process(target=_process, args=(jq,))
     p.start()
 
     for _ in range(1, count_elements):
-        __ = q.get()
-
-    q.close()
+        __ = qjq.get()
+        jq.task_done()
 
     p.join()
+
+    jq.close()
 
     finish = datetime.now()
     diff2 = finish-start
     print("[ROOT END] finish: {} | diff finish-start: {}".format(finish, diff2))
     print("")
-    print("[ROOT COMPARE] diff QuickQueue: {} | diff Queue: {}".format(diff1, diff2))
+    print("[ROOT COMPARE] diff QuickJoinableQueue: {} | diff JoinableQueue: {}".format(diff1, diff2))

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # @autor: Ramón Invarato Menéndez
-# @version 1.0
+# @version 1.7
 import logging
 import multiprocessing.context
 import multiprocessing.queues
@@ -15,8 +15,8 @@ except ImportError:
 
 
 __test__ = {'import_test': """
-                           >>> from sorted_in_disk.quick_queue import *
-
+                           >>> from quick_queue.quick_queue import QQueue, QJoinableQueue
+                           >>> import multiprocessing
                            """
             }
 
@@ -79,6 +79,65 @@ def QQueue(*args, **kwargs):
     return QuickQueue(*args, **kwargs)
 
 
+def QJoinableQueue(*args, **kwargs):
+    """
+    This method return one instance of QuickJoinableQueue.
+
+    It is importan the size of list (named here "bucket list") in relation productor and consumers process to have
+    the best performance. If queue is full, mean consumers are slower than productor; on the other hand, if
+    queue is empty, mean productor is slower than consumers. Then, best size of bucket list (size_bucket_list) is
+    where queue is not full and not empty. Here, I implemented one sensor to determinate in realtime the
+    size_bucket_list, you can enable this sensor if size_bucket_list is None (if you define a size_bucket_list
+    number, then you want a constant value to size_bucket_list); by default is enable the sensor
+    (size_bucket_list=None), because depend on Hardware in your computer this value should change, I recommend
+    you test the best performance for your computer modifying size_bucket_list (None and with number value).
+
+    Example of use (about doctest: Process not work in doctest, you can try this example in
+    test/test_joinablequeue_simple.py):
+    >>> def _process(qjq):
+    ...     print(qjq.get())
+    ...     print(qjq.get())
+    ...     print(qjq.get())
+    ...     qjq.task_done()
+    >>> qjq = QJoinableQueue()
+    >>> p = multiprocessing.Process(target=_process, args=(qjq,))
+    >>> p.start()
+    >>> qjq.put("A")
+    >>> qjq.put("B")
+    >>> qjq.put("C")
+    >>> qjq.join()
+    >>> p.join()
+
+    Note: end() method close and put data remain. If you only want put data remain (no close queue)
+    use put_remain()
+
+    Example with iterable (about doctest: Process not work in doctest, you can try one example similar in
+    test/test_joinablequeue_iterable.py):
+    >> def _process(qjq):
+    ...     print(qjq.get())
+    ...     print(qjq.get())
+    ...     print(qjq.get())
+    >>> qjq = QJoinableQueue()
+    >>> p = multiprocessing.Process(target=_process, args=(qjq,))
+    >>> p.start()
+    >>> qjq.put_iterable(["A", "B", "C"])
+    >>> qjq.join()
+    >>> p.join()
+
+    :param maxsize: maxsize of buckets in queue. If maxsize<=0 then queue is infinite (and sensor is disabled).
+                    By default: 1000
+    :param size_bucket_list: None to enable sensor size bucket list (require maxsize>0). If a number is defined
+                             here then use this number to size_bucket_list and disable sensor. If maxsize<=0
+                             and size_bucket_list==None then size_bucket_list is default to 1000; other wise,
+                             if maxsize<=0 and size_bucket_list is defined, then use this number. By default: None
+    :param min_size_bucket_list: (only if sensor is enabled) min size bucket list.
+                                 Min == 1 and max == max_size_bucket_list - 1. By default: 10
+    :param max_size_bucket_list: (only if sensor is enabled) max size bucket list. If None is infinite.
+                                 By defatult: None
+    """
+    return QuickJoinableQueue(*args, **kwargs)
+
+
 class QuickQueue(multiprocessing.queues.Queue):
 
     def __init__(self,
@@ -86,7 +145,8 @@ class QuickQueue(multiprocessing.queues.Queue):
                  size_bucket_list=None,
                  min_size_bucket_list=10,
                  max_size_bucket_list=None,
-                 logging_level=logging.WARNING):
+                 logging_level=logging.WARNING,
+                 ctx=None):
         """
         This class is a data wrapper into list structure to put in multiprocess queue and
         to accelerate enqueue and dequeue.
@@ -107,7 +167,7 @@ class QuickQueue(multiprocessing.queues.Queue):
                                      By defatult: None
         :raise ValueError: if min_size_bucket_list is not: 1 < min_size_bucket_list <= max_size_bucket_list - 1
         """
-        multiprocessing.queues.Queue.__init__(self, maxsize, ctx=multiprocessing.get_context())
+        multiprocessing.queues.Queue.__init__(self, maxsize, ctx=multiprocessing.get_context() if ctx is None else ctx)
 
         self.enable_sensor = None
         self.size_bucket_list = None
@@ -172,6 +232,7 @@ class QuickQueue(multiprocessing.queues.Queue):
                                      By default: 10
         :param max_size_bucket_list: (only if sensor is enabled) max size bucket list. If None is infinite.
                                      By defatult: None
+        :param logging_level: logging level. By default: logging.WARNING
         :raise ValueError: if min_size_bucket_list is not: 1 < min_size_bucket_list <= max_size_bucket_list - 1
         :return:
         """
@@ -413,3 +474,97 @@ class QuickQueue(multiprocessing.queues.Queue):
         except AttributeError:
             self.bucket_getting = self.get_bucket(*args, **kwargs)
             return self.get(*args, **kwargs)
+
+
+class QuickJoinableQueue(QuickQueue,
+                         multiprocessing.queues.JoinableQueue):
+
+    def __init__(self,
+                 maxsize=1000,
+                 size_bucket_list=None,
+                 min_size_bucket_list=10,
+                 max_size_bucket_list=None,
+                 logging_level=logging.WARNING,
+                 ctx=None):
+        """
+        This class is a data wrapper into list structure to put in multiprocess queue and
+        to accelerate enqueue and dequeue.
+
+        Multiprocess queue is pretty slow putting and getting individual data, then this class wrap several data in
+        a list, this list is one single data that is enqueue in queue than is more quickly than put one individual data.
+
+        :param maxsize: maxsize of buckets in queue. If maxsize<=0 then queue is infinite (and sensor is disabled).
+                        By default: 1000
+        :param size_bucket_list: None to enable sensor size bucket list (require maxsize>0). If a number is defined
+                                 here then use this number to size_bucket_list and disable sensor. If maxsize<=0
+                                 and size_bucket_list==None then size_bucket_list is default to 1000; other wise,
+                                 if maxsize<=0 and size_bucket_list is defined, then use this number. By default: None
+        :param min_size_bucket_list: (only if sensor is enabled) min size bucket list.
+                                     Min == 1 and max == max_size_bucket_list - 1 (other wise, this raise a ValueError).
+                                     By default: 10
+        :param max_size_bucket_list: (only if sensor is enabled) max size bucket list. If None is infinite.
+                                     By defatult: None
+        :raise ValueError: if min_size_bucket_list is not: 1 < min_size_bucket_list <= max_size_bucket_list - 1
+        """
+        self._ctx = multiprocessing.get_context() if ctx is None else ctx
+        QuickQueue.__init__(self,
+                            maxsize=maxsize,
+                            size_bucket_list=size_bucket_list,
+                            min_size_bucket_list=min_size_bucket_list,
+                            max_size_bucket_list=max_size_bucket_list,
+                            logging_level=logging_level,
+                            ctx=self._ctx)
+        multiprocessing.queues.JoinableQueue.__init__(self, maxsize, ctx=self._ctx)
+
+    def put_bucket(self, bucket, block=True, timeout=None):
+        """
+        This put in queue a list of data
+
+        :param bucket: list of individual data
+        :param block: optional args block is true and timeout is None (the default), block if necessary until a free
+        slot is available.
+        :param timeout: If timeout is a positive number, it blocks at most timeout seconds and raises the Full exception
+        if no free slot was available within that time. Otherwise (block is false), put an item on the queue if a free
+        slot is immediately available, else raise the Full exception (timeout is ignored in that case).
+        :return:
+        """
+
+        if self._closed:
+            raise ValueError(f"Queue {self!r} is closed")
+        if not self._sem.acquire(block, timeout):
+            raise queue.Full
+
+        with self._notempty, self._cond:
+            if self._thread is None:
+                self._start_thread()
+
+            c = len(bucket)
+            self._buffer.append(bucket)
+
+            for _ in range(c):
+                self._unfinished_tasks.release()
+
+            self._notempty.notify()
+
+    def join(self):
+        """
+        Blocks until all items in the queue have been gotten and processed.
+
+        The count of unfinished tasks goes up whenever an item is added to the queue.
+        The count goes down whenever a consumer thread calls task_done() to indicate
+        that the item was retrieved and all work on it is complete. When the count of
+        unfinished tasks drops to zero, join() unblocks.
+        :return:
+        """
+        QuickQueue.put_remain(self)
+        multiprocessing.queues.JoinableQueue.join(self)
+
+    def end(self):
+        """
+        Do not use end method with QuickJoinableQueue.
+        Use join or put_remain instead.
+        You need call to close method if you need it.
+        :return:
+        """
+        QuickQueue.put_remain(self)
+        raise Warning("With QuickJoinableQueue use join() or put_remain()")
